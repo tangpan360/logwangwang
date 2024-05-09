@@ -1,0 +1,35 @@
+README.md
+test.py
+
+*.csv
+*.log
+*.pt
+*.bin
+
+# Editors
+.vscode/
+.idea/
+
+# Folder
+loss_dir/
+saved_model/
+Dataset/
+bert_mini_checkpoint/
+bert_mini_checkpoint_wo_DA_result/
+bert_tiny_checkpoint/
+bert_tiny_checkpoint_wo_DA_result/
+loss_path/
+model_path/
+
+
+
+# Mac/OSX
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
