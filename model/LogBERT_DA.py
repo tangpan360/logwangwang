@@ -40,6 +40,9 @@ class LogBERT_DA(nn.Module):
         self.feature_extractor = BertModel.from_pretrained(bert_config_file_path, config=feature_extractor_config)
         print('loading finish :D\n')
 
+        '''
+        w domain
+        '''
         # for param in self.feature_extractor.parameters():
         #     param.requires_grad_(False)
 
@@ -51,13 +54,16 @@ class LogBERT_DA(nn.Module):
             # nn.Sigmoid(),
         )
 
-        self.domain_classifier = nn.Sequential(
-            # nn.Dropout(p=domain_pred_dropout_ratio),
-            nn.Linear(self.feature_extractor.config.hidden_size, domain_pred_dim),
-            nn.GELU(),
-            nn.Linear(domain_pred_dim, 1),
-            # nn.Sigmoid(), 
-        )
+        '''
+        wo domain
+        '''
+        # self.domain_classifier = nn.Sequential(
+        #     # nn.Dropout(p=domain_pred_dropout_ratio),
+        #     nn.Linear(self.feature_extractor.config.hidden_size, domain_pred_dim),
+        #     nn.GELU(),
+        #     nn.Linear(domain_pred_dim, 1),
+        #     # nn.Sigmoid(),
+        # )
 
         self.sigmoid = nn.Sigmoid()
 
@@ -74,11 +80,21 @@ class LogBERT_DA(nn.Module):
         class_output = self.class_predictor(bert_output)
         class_output = self.sigmoid(class_output)
 
-        reverse_bert_output = GRL.apply(bert_output, self.alpha)
-        domain_output = self.domain_classifier(reverse_bert_output)
-        domain_output = self.sigmoid(domain_output)
+        '''
+        wo domain
+        '''
+        # reverse_bert_output = GRL.apply(bert_output, self.alpha)
+        # domain_output = self.domain_classifier(reverse_bert_output)
+        # domain_output = self.sigmoid(domain_output)
 
-        return class_output, domain_output
+        '''
+        wo domain
+        '''
+        return class_output
+        '''
+        w domain
+        '''
+        # return class_output, domain_output
     
     def name(self, ):
         return self.__class__.__name__

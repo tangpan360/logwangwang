@@ -2,13 +2,13 @@ import os
 import pandas as pd
 import torch
 
-
 from argparse import ArgumentParser
 from torch.utils.data import DataLoader
 
 from utils import set_seed, parsing, DataPreprocess, Trainer
 from utils import LogDatasetDomainAdaptation_Train, LogDatasetDomainAdaptation_Eval, LogDatasetDomainAdaptation_Test
 from model import LogBERT_DA
+
 
 def arg_parser():
 
@@ -30,8 +30,8 @@ def arg_parser():
     
     # training parameters
     parser.add_argument("--max_epoch", help="epochs", default=2000)
-    parser.add_argument("--batch_size", help="batch size", default=360)  # 1200, 600
-    parser.add_argument("--lr", help="learning size", default=0.0001)
+    parser.add_argument("--batch_size", help="batch size", default=600)  # 1200, 600
+    parser.add_argument("--lr", help="learning rate", default=1e-4)
     parser.add_argument("--weight_decay", help="weight decay", default=1e-6)
     parser.add_argument("--eps", help="minimum center value", default=0.1)
     parser.add_argument("--n_epochs_stop", help="n epochs stop if not improve in valid loss", default=10)
@@ -40,7 +40,7 @@ def arg_parser():
     parser.add_argument('--auto_mixed_precision', help='do amp or not', default=True)
     parser.add_argument('--if_step_lr', help='do weight decay or not', default=True)
     parser.add_argument('--lr_change_step', help='', default=1)
-    parser.add_argument('--lr_change_gamma', help='', default=0.995)
+    parser.add_argument('--lr_change_gamma', help='', default=0.99)
     parser.add_argument('--patience', help='patience of early stop', default=500)
 
     # word2vec parameters
@@ -80,8 +80,6 @@ def arg_parser():
     '''    
 
     return parser
-
-
 
 
 def Fortnight():
@@ -144,21 +142,21 @@ def Fortnight():
                              seed=options['random_seed'], w2c_workers=options['w2c_workers'],
                              bert_pretrained_model=options['bert_pretrained_model'], bert_config_file_path=options['bert_config_file_path'],
                              n_processer=options['n_processer'], padding=options['padding'], max_length=options['max_length'],
-                             window_size=options['window_size'], step_size=options['step_size'], 
+                             window_size=options['window_size'], step_size=options['step_size'],
                              train_size=options['train_test_ratio'], source_target_ratio=options['source_target_ratio'])
     train_dataset = LogDatasetDomainAdaptation_Train(source_data_dict=dataset.get_train_data_dict()[0],
                                                      target_data_dict=dataset.get_train_data_dict()[1])
     eval_dataset = LogDatasetDomainAdaptation_Eval(source_data_dict=dataset.get_eval_data_dict())
     test_dataset = LogDatasetDomainAdaptation_Test(target_data_dict=dataset.get_test_data_dict())
 
-    train_loader = DataLoader(train_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False, pin_memory=True, num_workers=8)
-    eval_loader = DataLoader(eval_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False, pin_memory=True, num_workers=8)
-    test_loader = DataLoader(test_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False, pin_memory=True, num_workers=8)
+    train_loader = DataLoader(train_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
+    eval_loader = DataLoader(eval_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
+    test_loader = DataLoader(test_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
 
     model = LogBERT_DA(class_pred_dim=options['class_pred_dim'],
-                       domain_pred_dim=options['domain_pred_dim'], 
+                       domain_pred_dim=options['domain_pred_dim'],
                        bert_config_file_path=options['bert_config_file_path'])
-    
+
     LogBERT_DA_trainer = Trainer(options=options, model=model)
     LogBERT_DA_trainer.train(options=options,
                              train_loader=train_loader,
@@ -166,11 +164,9 @@ def Fortnight():
                              test_loader=test_loader)
 
     LogBERT_DA_trainer.test(weight_file_path='./model_path',  # options['model_path']
-                            test_loader=test_loader)
-
+                            test_loader=eval_loader)
 
     pass
-
 
 
 if __name__ == '__main__':
