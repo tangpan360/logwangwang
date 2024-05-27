@@ -29,8 +29,8 @@ def arg_parser():
     parser.add_argument('--minimum_drop_length', help='drop sequences whose length is less than the shreshold, valid only when minimum_drop_length > 0', default=5)
     
     # training parameters
-    parser.add_argument("--max_epoch", help="epochs", default=2000)
-    parser.add_argument("--batch_size", help="batch size", default=600)  # 1200, 600
+    parser.add_argument("--max_epoch", help="epochs", default=20)
+    parser.add_argument("--batch_size", help="batch size", default=20)  # 1200, 600
     parser.add_argument("--lr", help="learning rate", default=1e-4)
     parser.add_argument("--weight_decay", help="weight decay", default=1e-6)
     parser.add_argument("--eps", help="minimum center value", default=0.1)
@@ -164,7 +164,7 @@ def Fortnight():
                              test_loader=test_loader)
 
     LogBERT_DA_trainer.test(weight_file_path='./model_path',  # options['model_path']
-                            test_loader=eval_loader)
+                            test_loader=test_loader)
 
     pass
 
