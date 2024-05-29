@@ -109,6 +109,8 @@ class Trainer(object):
             source_label_train = batch[1]
             target_data_train = batch[2]
             target_label_train = batch[3]
+            target_data_train_with_label = batch[4]
+            target_label_train_with_label = batch[5]
             
             self.optimizer.zero_grad()
 
@@ -126,6 +128,13 @@ class Trainer(object):
                 source_class_loss = self.loss_calculator(class_output, source_label_train['class_label'].to(self.device))
                 source_domain_loss = self.loss_calculator(domain_output, source_label_train['domain_label'].to(self.device))
 
+                class_output_target, _ = self.model(input_ids=target_data_train_with_label['input_ids'].to(self.device),
+                                                    attention_mask=target_data_train_with_label['attention_mask'].to(self.device))
+                # class_output_target, domain_output_target = self.model(input_ids=target_data_train_with_label['input_ids'].to(self.device),
+                #                                     attention_mask=target_data_train_with_label['attention_mask'].to(self.device))
+                target_class_loss_with_label = self.loss_calculator(class_output_target, target_label_train_with_label['class_label'].to(self.device))
+                # target_domain_loss_with_label = self.loss_calculator(domain_output_target, target_label_train_with_label['domain_label'].to(self.device))
+
                 _, domain_output = self.model(input_ids=target_data_train['input_ids'].to(self.device),
                                               attention_mask=target_data_train['attention_mask'].to(self.device))
                 target_domain_loss = self.loss_calculator(domain_output, target_label_train['domain_label'].to(self.device))
@@ -136,7 +145,8 @@ class Trainer(object):
                 # loss = source_class_loss / (source_class_loss.detach() + 10e-8) + \
                 #        source_domain_loss / (source_domain_loss.detach() + 10e-8) + \
                 #        target_domain_loss / (target_domain_loss.detach() + 10e-8)
-                loss = source_class_loss + source_domain_loss + target_domain_loss  # add by tp
+                loss = source_class_loss + source_domain_loss + target_domain_loss + target_class_loss_with_label  # add by tp
+                # loss = source_class_loss + source_domain_loss + target_domain_loss + target_class_loss_with_label + target_domain_loss_with_label # add by tp
                 self.train_class_loss += source_class_loss.item() / len(train_loader)
                 self.train_doamin_loss += (source_domain_loss.item() + target_domain_loss.item()) / len(train_loader)
 

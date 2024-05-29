@@ -17,7 +17,7 @@ def arg_parser():
     parser.add_argument("--source_dataset_name", help="please choose source dataset name from BGL or Thunderbird", default="Thunderbird")
     parser.add_argument("--target_dataset_name", help="please choose target dataset name from BGL or Thunderbird", default="BGL")
     parser.add_argument("--device", help="hardware device", default='cuda')
-    parser.add_argument("--random_seed", help="random seed", default=219)
+    parser.add_argument("--random_seed", help="random seed", default=42)
     parser.add_argument("--download_datasets", help="download datasets or not", default=False)
     parser.add_argument("--output_dir", metavar="DIR", help="output directory", default="Dataset")
     parser.add_argument("--model_dir", metavar="DIR", help="output directory", default="Dataset")
@@ -30,18 +30,18 @@ def arg_parser():
     
     # training parameters
     parser.add_argument("--max_epoch", help="epochs", default=20)
-    parser.add_argument("--batch_size", help="batch size", default=20)  # 1200, 600
+    parser.add_argument("--batch_size", help="batch size", default=200)  # 1200, 600
     parser.add_argument("--lr", help="learning rate", default=1e-4)
+    parser.add_argument('--patience', help='patience of early stop', default=500)
     parser.add_argument("--weight_decay", help="weight decay", default=1e-6)
     parser.add_argument("--eps", help="minimum center value", default=0.1)
-    parser.add_argument("--n_epochs_stop", help="n epochs stop if not improve in valid loss", default=10)
+    # parser.add_argument("--n_epochs_stop", help="n epochs stop if not improve in valid loss", default=10)
     parser.add_argument("--loss_path", metavar="DIR", help="loss directory", default="loss_path")
     parser.add_argument("--model_path", metavar="DIR", help="saved model dir", default="model_path")
     parser.add_argument('--auto_mixed_precision', help='do amp or not', default=True)
     parser.add_argument('--if_step_lr', help='do weight decay or not', default=True)
     parser.add_argument('--lr_change_step', help='', default=1)
     parser.add_argument('--lr_change_gamma', help='', default=0.99)
-    parser.add_argument('--patience', help='patience of early stop', default=500)
 
     # word2vec parameters
     parser.add_argument('--do_w2v', help='do word2vec embedding or not', default=False)
@@ -145,7 +145,8 @@ def Fortnight():
                              window_size=options['window_size'], step_size=options['step_size'],
                              train_size=options['train_test_ratio'], source_target_ratio=options['source_target_ratio'])
     train_dataset = LogDatasetDomainAdaptation_Train(source_data_dict=dataset.get_train_data_dict()[0],
-                                                     target_data_dict=dataset.get_train_data_dict()[1])
+                                                     target_data_dict=dataset.get_train_data_dict()[1],
+                                                     target_data_with_label_dict=dataset.get_train_data_dict()[2])
     eval_dataset = LogDatasetDomainAdaptation_Eval(source_data_dict=dataset.get_eval_data_dict())
     test_dataset = LogDatasetDomainAdaptation_Test(target_data_dict=dataset.get_test_data_dict())
 
