@@ -15,9 +15,11 @@ def arg_parser():
     parser = ArgumentParser()
 
     parser.add_argument("--source_dataset_name", help="please choose source dataset name from BGL or Thunderbird", default="Thunderbird")
+    # parser.add_argument("--source_dataset_name", help="please choose source dataset name from BGL or Thunderbird", default="BGL")
     parser.add_argument("--target_dataset_name", help="please choose target dataset name from BGL or Thunderbird", default="BGL")
+    # parser.add_argument("--target_dataset_name", help="please choose target dataset name from BGL or Thunderbird", default="Thunderbird")
     parser.add_argument("--device", help="hardware device", default='cuda')
-    parser.add_argument("--random_seed", help="random seed", default=42)
+    parser.add_argument("--random_seed", help="random seed", default=62)
     parser.add_argument("--download_datasets", help="download datasets or not", default=False)
     parser.add_argument("--output_dir", metavar="DIR", help="output directory", default="Dataset")
     parser.add_argument("--model_dir", metavar="DIR", help="output directory", default="Dataset")
@@ -29,10 +31,10 @@ def arg_parser():
     parser.add_argument('--minimum_drop_length', help='drop sequences whose length is less than the shreshold, valid only when minimum_drop_length > 0', default=5)
     
     # training parameters
-    parser.add_argument("--max_epoch", help="epochs", default=20)
+    parser.add_argument("--max_epoch", help="epochs", default=500)
     parser.add_argument("--batch_size", help="batch size", default=200)  # 1200, 600
-    parser.add_argument("--lr", help="learning rate", default=1e-4)
-    parser.add_argument('--patience', help='patience of early stop', default=500)
+    parser.add_argument("--lr", help="learning rate", default=1e-5)
+    parser.add_argument('--patience', help='patience of early stop', default=100)
     parser.add_argument("--weight_decay", help="weight decay", default=1e-6)
     parser.add_argument("--eps", help="minimum center value", default=0.1)
     # parser.add_argument("--n_epochs_stop", help="n epochs stop if not improve in valid loss", default=10)
@@ -127,8 +129,10 @@ def Fortnight():
     # df_target = pd.read_csv(os.path.join(dataset_root_path, '{}.log_structured.csv'.format(options['target_dataset_name'])), nrows=1000)
     print('loading target dataset: {} dataset\n'.format(options['target_dataset_name']))
 
-    source_df_path=os.path.join(dataset_root_path, '{}.log_structured.csv'.format(options['source_dataset_name']))
-    target_df_path=os.path.join(dataset_root_path, '{}.log_structured.csv'.format(options['target_dataset_name']))
+    # source_df_path=os.path.join(dataset_root_path, '{}.log_structured.csv'.format(options['source_dataset_name']))
+    # target_df_path=os.path.join(dataset_root_path, '{}.log_structured.csv'.format(options['target_dataset_name']))
+    source_df_path = os.path.join(dataset_root_path, '{}.log_structured_slided.feather'.format(options['source_dataset_name']))
+    target_df_path = os.path.join(dataset_root_path, '{}.log_structured_slided.feather'.format(options['target_dataset_name']))
 
     '''
     FIXME: 新增 options 参数
@@ -144,15 +148,19 @@ def Fortnight():
                              n_processer=options['n_processer'], padding=options['padding'], max_length=options['max_length'],
                              window_size=options['window_size'], step_size=options['step_size'],
                              train_size=options['train_test_ratio'], source_target_ratio=options['source_target_ratio'])
-    train_dataset = LogDatasetDomainAdaptation_Train(source_data_dict=dataset.get_train_data_dict()[0],
-                                                     target_data_dict=dataset.get_train_data_dict()[1],
-                                                     target_data_with_label_dict=dataset.get_train_data_dict()[2])
+    # train_dataset = LogDatasetDomainAdaptation_Train(source_data_dict=dataset.get_train_data_dict()[0],
+    #                                                  target_data_dict=dataset.get_train_data_dict()[1],
+    #                                                  target_data_with_label_dict=dataset.get_train_data_dict()[2])
+    train_dataset = LogDatasetDomainAdaptation_Train(source_data_dict=dataset.get_train_data_dict())
     eval_dataset = LogDatasetDomainAdaptation_Eval(source_data_dict=dataset.get_eval_data_dict())
-    test_dataset = LogDatasetDomainAdaptation_Test(target_data_dict=dataset.get_test_data_dict())
+    # test_dataset = LogDatasetDomainAdaptation_Test(target_data_dict=dataset.get_test_data_dict())
+    test_dataset_source = LogDatasetDomainAdaptation_Test(source_data_dict=dataset.get_test_data_dict()[0])
+    test_dataset_target = LogDatasetDomainAdaptation_Test(source_data_dict=dataset.get_test_data_dict()[1])
 
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
     eval_loader = DataLoader(eval_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
-    test_loader = DataLoader(test_dataset, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
+    test_loader_source = DataLoader(test_dataset_source, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
+    test_loader_target = DataLoader(test_dataset_target, shuffle=True, batch_size=options['batch_size'], drop_last=False)  # , pin_memory=False, num_workers=8)
 
     model = LogBERT_DA(class_pred_dim=options['class_pred_dim'],
                        domain_pred_dim=options['domain_pred_dim'],
@@ -162,10 +170,12 @@ def Fortnight():
     LogBERT_DA_trainer.train(options=options,
                              train_loader=train_loader,
                              eval_loader=eval_loader,
-                             test_loader=test_loader)
+                             test_loader=test_loader_target)
 
     LogBERT_DA_trainer.test(weight_file_path='./model_path',  # options['model_path']
-                            test_loader=test_loader)
+                            test_loader=test_loader_source)
+    LogBERT_DA_trainer.test(weight_file_path='./model_path',  # options['model_path']
+                            test_loader=test_loader_target)
 
     pass
 

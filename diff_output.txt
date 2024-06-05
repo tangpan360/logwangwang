@@ -1,0 +1,41 @@
+diff --git a/utils/preprocessing.py b/utils/preprocessing.py
+index c779ea3..0587def 100644
+--- a/utils/preprocessing.py
++++ b/utils/preprocessing.py
+@@ -182,8 +182,8 @@ class DataPreprocess(object):
+         '''
+         Jupyter only
+         '''
+-        df_source = pd.read_feather('./Dataset/Thunderbird.log_structured_slided.feather', ).sample(frac=0.1, ignore_index=True, random_state=seed)
+-        df_target = pd.read_feather('./Dataset/BGL.log_structured_slided.feather', ).sample(frac=0.1, ignore_index=True, random_state=seed)
++        df_source = pd.read_feather('./Dataset/Thunderbird.log_structured_slided.feather', ).sample(frac=0.01, ignore_index=True, random_state=seed)
++        df_target = pd.read_feather('./Dataset/BGL.log_structured_slided.feather', ).sample(frac=0.01, ignore_index=True, random_state=seed)
+ 
+         # 从目标域抽取100组数据，扩充到和源域相等的数量
+         df_label_0 = df_target[df_target['label'] == 0]
+diff --git a/utils/trainer.py b/utils/trainer.py
+index f08274b..256487a 100644
+--- a/utils/trainer.py
++++ b/utils/trainer.py
+@@ -104,7 +104,7 @@ class Trainer(object):
+         self.model.train()
+         loss = None
+ 
+-        for batch in train_loader:
++        for (i, batch) in enumerate(train_loader):
+             source_data_train = batch[0]
+             source_label_train = batch[1]
+             target_data_train = batch[2]
+diff --git a/wangwang.py b/wangwang.py
+index e280d59..d806bff 100644
+--- a/wangwang.py
++++ b/wangwang.py
+@@ -29,7 +29,7 @@ def arg_parser():
+     parser.add_argument('--minimum_drop_length', help='drop sequences whose length is less than the shreshold, valid only when minimum_drop_length > 0', default=5)
+     
+     # training parameters
+-    parser.add_argument("--max_epoch", help="epochs", default=20)
++    parser.add_argument("--max_epoch", help="epochs", default=100)
+     parser.add_argument("--batch_size", help="batch size", default=200)  # 1200, 600
+     parser.add_argument("--lr", help="learning rate", default=1e-4)
+     parser.add_argument('--patience', help='patience of early stop', default=500)

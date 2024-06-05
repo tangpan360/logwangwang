@@ -104,13 +104,13 @@ class Trainer(object):
         self.model.train()
         loss = None
 
-        for batch in train_loader:
+        for (i, batch) in enumerate(train_loader):
             source_data_train = batch[0]
             source_label_train = batch[1]
-            target_data_train = batch[2]
-            target_label_train = batch[3]
-            target_data_train_with_label = batch[4]
-            target_label_train_with_label = batch[5]
+            # target_data_train = batch[2]
+            # target_label_train = batch[3]
+            # target_data_train_with_label = batch[4]
+            # target_label_train_with_label = batch[5]
             
             self.optimizer.zero_grad()
 
@@ -128,16 +128,16 @@ class Trainer(object):
                 source_class_loss = self.loss_calculator(class_output, source_label_train['class_label'].to(self.device))
                 source_domain_loss = self.loss_calculator(domain_output, source_label_train['domain_label'].to(self.device))
 
-                class_output_target, _ = self.model(input_ids=target_data_train_with_label['input_ids'].to(self.device),
-                                                    attention_mask=target_data_train_with_label['attention_mask'].to(self.device))
+                # class_output_target, _ = self.model(input_ids=target_data_train_with_label['input_ids'].to(self.device),
+                #                                     attention_mask=target_data_train_with_label['attention_mask'].to(self.device))
                 # class_output_target, domain_output_target = self.model(input_ids=target_data_train_with_label['input_ids'].to(self.device),
                 #                                     attention_mask=target_data_train_with_label['attention_mask'].to(self.device))
-                target_class_loss_with_label = self.loss_calculator(class_output_target, target_label_train_with_label['class_label'].to(self.device))
+                # target_class_loss_with_label = self.loss_calculator(class_output_target, target_label_train_with_label['class_label'].to(self.device))
                 # target_domain_loss_with_label = self.loss_calculator(domain_output_target, target_label_train_with_label['domain_label'].to(self.device))
 
-                _, domain_output = self.model(input_ids=target_data_train['input_ids'].to(self.device),
-                                              attention_mask=target_data_train['attention_mask'].to(self.device))
-                target_domain_loss = self.loss_calculator(domain_output, target_label_train['domain_label'].to(self.device))
+                # _, domain_output = self.model(input_ids=target_data_train['input_ids'].to(self.device),
+                #                               attention_mask=target_data_train['attention_mask'].to(self.device))
+                # target_domain_loss = self.loss_calculator(domain_output, target_label_train['domain_label'].to(self.device))
 
                 # a = 0.9
                 # loss =  a * source_class_loss + (1 - a) * (source_domain_loss + target_domain_loss)
@@ -145,10 +145,12 @@ class Trainer(object):
                 # loss = source_class_loss / (source_class_loss.detach() + 10e-8) + \
                 #        source_domain_loss / (source_domain_loss.detach() + 10e-8) + \
                 #        target_domain_loss / (target_domain_loss.detach() + 10e-8)
-                loss = source_class_loss + source_domain_loss + target_domain_loss + target_class_loss_with_label  # add by tp
-                # loss = source_class_loss + source_domain_loss + target_domain_loss + target_class_loss_with_label + target_domain_loss_with_label # add by tp
+                # loss = source_class_loss + source_domain_loss + target_domain_loss + target_class_loss_with_label  # add by tp
+                loss = source_class_loss + source_domain_loss  # add by tp
+                # self.train_class_loss += source_class_loss.item() / len(train_loader)
                 self.train_class_loss += source_class_loss.item() / len(train_loader)
-                self.train_doamin_loss += (source_domain_loss.item() + target_domain_loss.item()) / len(train_loader)
+                # self.train_doamin_loss += (source_domain_loss.item() + target_domain_loss.item()) / len(train_loader)
+                self.train_doamin_loss += source_domain_loss.item() / len(train_loader)
 
                 '''
                 wo domain
@@ -161,7 +163,8 @@ class Trainer(object):
                 # self.train_class_loss += source_class_loss.item() / len(train_loader)
   
             self.scaler.scale(loss).backward()
-            # nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.8, norm_type=2)
+            # TODO 调整正则
+            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.8, norm_type=2)
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
@@ -214,7 +217,8 @@ class Trainer(object):
             '''
             w domain
             '''
-            eval_loss = self.eval_doamin_loss # self.eval_class_loss + self.eval_doamin_loss
+            # eval_loss = self.eval_doamin_loss # self.eval_class_loss + self.eval_doamin_loss
+            eval_loss = self.eval_doamin_loss + self.eval_class_loss  # self.eval_class_loss + self.eval_doamin_loss
             self.eval_loss_list.append(eval_loss)
             self.eval_class_loss_list.append(self.eval_class_loss)
             self.eval_doamin_loss_list.append(self.eval_doamin_loss)
@@ -226,61 +230,61 @@ class Trainer(object):
             # eval_loss = self.eval_class_loss
             # self.eval_loss_list.append(eval_loss)
 
-        '''
-        Test model        
-        '''
-        self.model.eval()
+        # '''
+        # Test model
+        # '''
+        # self.model.eval()
+        #
+        # class_predict_list = list()
+        # domain_predict_list = list()
+        # class_gt_list = list()
+        # domain_gt_list = list()
+        #
+        # with torch.no_grad():
+        #     for batch in test_loader:
+        #         target_data_test = batch[0]
+        #         target_label_test = batch[1]
+        #
+        #         class_output, domain_output = self.model(input_ids=target_data_test['input_ids'].to(self.device),
+        #                                                  attention_mask=target_data_test['attention_mask'].to(self.device))
+        #
+        #         label_predict = class_output.ge(0.5).int().cpu().detach().numpy()
+        #         domain_predict = domain_output.ge(0.5).int().cpu().detach().numpy()
+        #         class_predict_list.append(label_predict)
+        #         domain_predict_list.append(domain_predict)
+        #
+        #         class_gt_list.append(target_label_test['class_label'])
+        #         domain_gt_list.append(target_label_test['domain_label'])
+        #
+        # class_predict_array = np.concatenate(class_predict_list, axis=0)
+        # domain_predict_array = np.concatenate(domain_predict_list, axis=0)
+        # class_gt_array = np.concatenate(class_gt_list, axis=0)
+        # domain_gt_array = np.concatenate(domain_gt_list, axis=0)
+        #
+        # # TODO: 汤哥，你自己改吧，我实在是没办法了，这一部分的测试效果不打印出来，最后直接将列表保存画图，或者是直接用 TensorBoard 做可视化
+        # self.class_accuracy = accuracy_score(class_gt_array, class_predict_array)
+        # # self.class_precision = precision_score(class_predict_array, class_gt_array)
+        # # self.class_recall = recall_score(class_predict_array, class_gt_array)
+        # self.class_f1_score = f1_score(class_gt_array, class_predict_array, average='macro')
+        #
+        # # self.class_accuracy_list.append(self.class_accuracy)
+        # # self.class_precision_list.append(self.class_precision)
+        # # self.class_recall_list.append(self.class_recall)
+        # # self.class_f1_score_list.append(self.class_f1_score)
+        #
+        # self.domain_accuracy = accuracy_score(domain_gt_array, domain_predict_array)
+        # # self.domain_precision = precision_score(domain_predict_array, domain_gt_array)
+        # # self.domain_recall = recall_score(domain_predict_array, domain_gt_array)
+        # self.domain_f1_score = f1_score(domain_gt_array, domain_predict_array, average='macro')
+        #
+        # # self.domain_accuracy_list.append(self.domain_accuracy)
+        # # self.domain_precision_list.append(self.domain_precision)
+        # # self.domain_recall_list.append(self.domain_recall)
+        # # self.domain_f1_score_list.append(self.domain_f1_score)
+        #
+        # # return self.class_f1_score
 
-        class_predict_list = list()
-        domain_predict_list = list()
-        class_gt_list = list()
-        domain_gt_list = list()
-
-        with torch.no_grad():
-            for batch in test_loader:
-                target_data_test = batch[0]
-                target_label_test = batch[1]
-
-                class_output, domain_output = self.model(input_ids=target_data_test['input_ids'].to(self.device),
-                                                         attention_mask=target_data_test['attention_mask'].to(self.device))
-
-                label_predict = class_output.ge(0.5).int().cpu().detach().numpy()
-                domain_predict = domain_output.ge(0.5).int().cpu().detach().numpy()
-                class_predict_list.append(label_predict)
-                domain_predict_list.append(domain_predict)
-
-                class_gt_list.append(target_label_test['class_label'])
-                domain_gt_list.append(target_label_test['domain_label'])
-
-        class_predict_array = np.concatenate(class_predict_list, axis=0)
-        domain_predict_array = np.concatenate(domain_predict_list, axis=0)
-        class_gt_array = np.concatenate(class_gt_list, axis=0)
-        domain_gt_array = np.concatenate(domain_gt_list, axis=0)
-
-        # TODO: 汤哥，你自己改吧，我实在是没办法了，这一部分的测试效果不打印出来，最后直接将列表保存画图，或者是直接用 TensorBoard 做可视化
-        self.class_accuracy = accuracy_score(class_gt_array, class_predict_array)
-        # self.class_precision = precision_score(class_predict_array, class_gt_array)
-        # self.class_recall = recall_score(class_predict_array, class_gt_array)
-        self.class_f1_score = f1_score(class_gt_array, class_predict_array, average='macro')
-
-        # self.class_accuracy_list.append(self.class_accuracy)
-        # self.class_precision_list.append(self.class_precision)
-        # self.class_recall_list.append(self.class_recall)
-        # self.class_f1_score_list.append(self.class_f1_score)
-
-        self.domain_accuracy = accuracy_score(domain_gt_array, domain_predict_array)
-        # self.domain_precision = precision_score(domain_predict_array, domain_gt_array)
-        # self.domain_recall = recall_score(domain_predict_array, domain_gt_array)
-        self.domain_f1_score = f1_score(domain_gt_array, domain_predict_array, average='macro')
-
-        # self.domain_accuracy_list.append(self.domain_accuracy)
-        # self.domain_precision_list.append(self.domain_precision)
-        # self.domain_recall_list.append(self.domain_recall)
-        # self.domain_f1_score_list.append(self.domain_f1_score)
-
-        return self.class_f1_score
-
-        # return eval_loss
+        return eval_loss
 
     
     def train(self, options: dict,
@@ -300,9 +304,12 @@ class Trainer(object):
                 '''
                 w domain
                 '''
-                tqdm.write('epoch: {:5} | lr: {:.16f} | train class loss: {:.16f} | train domain loss: {:.16f} | eval class loss: {:.16f} | eval domain loss: {:.16f} | test class f1 score: {:.16f}'. \
+                # tqdm.write('epoch: {:5} | lr: {:.16f} | train class loss: {:.16f} | train domain loss: {:.16f} | eval class loss: {:.16f} | eval domain loss: {:.16f} | test class f1 score: {:.16f}'. \
+                #             format(epoch, self.scheduler.get_last_lr()[0]/0.95, self.train_class_loss, self.train_doamin_loss,
+                #                    self.eval_class_loss, self.eval_doamin_loss, self.class_f1_score))
+                tqdm.write('epoch: {:5} | lr: {:.16f} | train class loss: {:.16f} | train domain loss: {:.16f} | eval class loss: {:.16f} | eval domain loss: {:.16f}'. \
                             format(epoch, self.scheduler.get_last_lr()[0]/0.95, self.train_class_loss, self.train_doamin_loss,
-                                   self.eval_class_loss, self.eval_doamin_loss, self.class_f1_score))
+                                   self.eval_class_loss, self.eval_doamin_loss))
 
                 '''
                 wo domain
@@ -352,7 +359,7 @@ class Trainer(object):
         domain_predict_list = list()
         class_gt_list = list()
         domain_gt_list = list()
-        
+
         with torch.no_grad():
             for batch in test_loader:
                 target_data_test = batch[0]
@@ -400,11 +407,11 @@ class Trainer(object):
                 #
                 # class_gt_list.append(target_label_test['class_label'])
 
-        class_predict_array = np.concatenate(class_predict_list, axis=0)
-        class_gt_array = np.concatenate(class_gt_list, axis=0)
-
-        self.class_accuracy = accuracy_score(class_predict_array, class_gt_array)
-        self.class_classification_report = classification_report(class_gt_array, class_predict_array, )
-
-        print('class classification accuracy: {}'.format(self.class_accuracy))
-        print(self.class_classification_report)
+        # class_predict_array = np.concatenate(class_predict_list, axis=0)
+        # class_gt_array = np.concatenate(class_gt_list, axis=0)
+        #
+        # self.class_accuracy = accuracy_score(class_predict_array, class_gt_array)
+        # self.class_classification_report = classification_report(class_gt_array, class_predict_array, )
+        #
+        # print('class classification accuracy: {}'.format(self.class_accuracy))
+        # print(self.class_classification_report)
