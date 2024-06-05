@@ -200,10 +200,10 @@ class DataPreprocess(object):
         # 从目标域抽取100组数据，扩充到和源域相等的数量
         df_label_0 = df_target[df_target['label'] == 0]
         df_label_1 = df_target[df_target['label'] == 1]
-        assert len(df_label_0) >= 500, "label 为 0 的样本少于 50 个"
-        assert len(df_label_1) >= 500, "label 为 1 的样本少于 50 个"
-        df_label_0_sample = df_label_0.sample(n=500, random_state=42)
-        df_label_1_sample = df_label_1.sample(n=500, random_state=42)
+        assert len(df_label_0) >= 100, "label 为 0 的样本少于 50 个"
+        assert len(df_label_1) >= 100, "label 为 1 的样本少于 50 个"
+        df_label_0_sample = df_label_0.sample(n=100, random_state=42)
+        df_label_1_sample = df_label_1.sample(n=100, random_state=42)
         df_target_train = pd.concat([df_label_0_sample, df_label_1_sample])
         df_target_test = df_target.drop(df_target_train.index)
 

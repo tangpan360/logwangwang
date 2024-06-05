@@ -71,9 +71,11 @@ class LogBERT_DA(nn.Module):
 
         self.alpha = grl_alpha
 
-    def forward(self, input_ids: torch.Tensor, 
+    def forward(self, input_ids: torch.Tensor,
                 attention_mask: torch.Tensor,
-                token_type_ids: torch.Tensor = None, ):
+                token_type_ids: torch.Tensor,
+                alpha: float, ):
+        self.alpha = alpha
         
         bert_output = self.feature_extractor(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
         # bert_output = torch.mean(bert_output['last_hidden_state'], dim=1)

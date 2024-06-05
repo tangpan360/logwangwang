@@ -90,8 +90,10 @@ class Trainer(object):
 
     def _train_one_epoch(self, train_loader: LogDatasetDomainAdaptation_Train, 
                          eval_loader: LogDatasetDomainAdaptation_Eval, 
-                         test_loader: LogDatasetDomainAdaptation_Test) -> None:
-        
+                         test_loader: LogDatasetDomainAdaptation_Test,
+                         epoch: int,
+                         epochs: int) -> None:
+
         self.train_class_loss = 0.
         self.train_doamin_loss = 0.
         self.eval_class_loss = 0.
@@ -105,6 +107,10 @@ class Trainer(object):
         loss = None
 
         for (i, batch) in enumerate(train_loader):
+
+            p = float(i + (epoch - 1) * len(train_loader)) / epochs / len(train_loader)
+            alpha = 2. / (1. + np.exp(-10 * p)) - 1
+
             source_data_train = batch[0]
             source_label_train = batch[1]
             # target_data_train = batch[2]
@@ -124,7 +130,9 @@ class Trainer(object):
                 w domain
                 '''
                 class_output, domain_output = self.model(input_ids=source_data_train['input_ids'].to(self.device),
-                                                         attention_mask=source_data_train['attention_mask'].to(self.device))
+                                                         attention_mask=source_data_train['attention_mask'].to(self.device),
+                                                         token_type_ids=None,
+                                                         alpha=alpha)
                 source_class_loss = self.loss_calculator(class_output, source_label_train['class_label'].to(self.device))
                 source_domain_loss = self.loss_calculator(domain_output, source_label_train['domain_label'].to(self.device))
 
@@ -196,7 +204,9 @@ class Trainer(object):
                 w domain 
                 '''
                 class_output, domain_output = self.model(input_ids=source_data_eval['input_ids'].to(self.device),
-                                                         attention_mask=source_data_eval['attention_mask'].to(self.device))
+                                                         attention_mask=source_data_eval['attention_mask'].to(self.device),
+                                                         token_type_ids=None,
+                                                         alpha=0)
                 source_class_loss = self.loss_calculator(class_output, source_label_eval['class_label'].to(self.device))
                 source_domain_loss = self.loss_calculator(domain_output, source_label_eval['domain_label'].to(self.device))
 
@@ -296,7 +306,8 @@ class Trainer(object):
 
         with tqdm(total=epochs, desc='Model training') as pbar:
             for epoch in range(1, epochs+1):
-                eval_loss = self._train_one_epoch(train_loader=train_loader, eval_loader=eval_loader, test_loader=test_loader)
+                eval_loss = self._train_one_epoch(train_loader=train_loader, eval_loader=eval_loader,
+                                                  test_loader=test_loader, epoch=epoch, epochs=epochs)
                 self.early_stop(val_loss=eval_loss, model=self.model, 
                                 path=os.path.join(self.model_save_path, '{}_{}.pt'.format(self.model.name(), epoch)),
                                 filepath=self.model_save_path)
@@ -369,7 +380,9 @@ class Trainer(object):
                 w domain
                 '''
                 class_output, domain_output = self.model(input_ids=target_data_test['input_ids'].to(self.device),
-                                                         attention_mask=target_data_test['attention_mask'].to(self.device))
+                                                         attention_mask=target_data_test['attention_mask'].to(self.device),
+                                                         token_type_ids=None,
+                                                         alpha=0)
 
                 label_predict = class_output.ge(0.5).int().cpu().detach().numpy()
                 domain_predict = domain_output.ge(0.5).int().cpu().detach().numpy()
