@@ -3,6 +3,7 @@ import numpy as np
 import time
 import torch
 import random
+import math
 
 from gensim.models import Word2Vec
 from nltk.tokenize import RegexpTokenizer
@@ -182,18 +183,47 @@ class DataPreprocess(object):
         '''
         Jupyter only
         '''
-        df_source = pd.read_feather('./Dataset/Thunderbird.log_structured_slided.feather', ).sample(frac=0.01, ignore_index=True, random_state=seed)
-        df_target = pd.read_feather('./Dataset/BGL.log_structured_slided.feather', ).sample(frac=0.01, ignore_index=True, random_state=seed)
+        df_source = pd.read_feather(source_df_path)
+        df_source['domain_label'] = 0
+        # df_source_train = pd.read_feather('./Dataset/Thunderbird.log_structured_slided.feather', ).sample(frac=0.1, ignore_index=True, random_state=seed)
+        df_source_train = df_source.sample(frac=0.1, ignore_index=False, random_state=seed)
+        # df_source_train = df_source_train.sort_index()
+        # df_source_test = pd.read_feather('./Dataset/Thunderbird.log_structured_slided.feather', ).drop(df_source_train.index).reset_index(drop=True)
+        df_source_test = df_source.drop(df_source_train.index)
+        df_source_test = df_source_test.sample(frac=1, random_state=seed)
+
+        df_target = pd.read_feather(target_df_path)
+        # df_target = pd.read_feather('./Dataset/BGL.log_structured_slided.feather', ).sample(frac=1, ignore_index=True, random_state=seed)
+        df_target = df_target.sample(frac=1, ignore_index=True, random_state=seed)
+
+        df_target['domain_label'] = 1
+        # 从目标域抽取100组数据，扩充到和源域相等的数量
+        df_label_0 = df_target[df_target['label'] == 0]
+        df_label_1 = df_target[df_target['label'] == 1]
+        assert len(df_label_0) >= 500, "label 为 0 的样本少于 50 个"
+        assert len(df_label_1) >= 500, "label 为 1 的样本少于 50 个"
+        df_label_0_sample = df_label_0.sample(n=500, random_state=42)
+        df_label_1_sample = df_label_1.sample(n=500, random_state=42)
+        df_target_train = pd.concat([df_label_0_sample, df_label_1_sample])
+        df_target_test = df_target.drop(df_target_train.index)
+
+        multiplier = math.ceil(len(df_source_train) / len(df_target_train))
+        df_target_train = pd.concat([df_target_train] * multiplier, ignore_index=True)
+        df_target_train = df_target_train[:len(df_source_train)]
+        df_train = pd.concat((df_source_train, df_target_train), ignore_index=True)
+        # df_source = pd.concat((df_source, df_sampled_target), ignore_index=True)
+        # df_source = df_source.sample(frac=1, random_state=seed, ignore_index=True)
+
 
         '''
         Jupyter only
         '''
-        source_input_ids = torch.Tensor(np.vstack(df_source['input_ids'].values))
+        source_input_ids = torch.Tensor(np.vstack(df_train['input_ids'].values))
         source_token_type_ids = torch.zeros(source_input_ids.shape[0], 512)
-        source_attention_mask = torch.Tensor(np.vstack(df_source['attention_mask'].values))
-        s_class_list = list(df_source['label'].values)
-        s_domain_list = [0] * source_input_ids.shape[0]
-        
+        source_attention_mask = torch.Tensor(np.vstack(df_train['attention_mask'].values))
+        s_class_list = list(df_train['label'].values)
+        s_domain_list = list(df_train['domain_label'].values)
+
         '''
         Preprocess only
         '''
@@ -232,40 +262,46 @@ class DataPreprocess(object):
         # target_token_type_ids = t_log_dict['token_type_ids']
         # target_attention_mask = t_log_dict['attention_mask']
 
-        '''
-        Jupyter only
-        '''
-        target_input_ids = torch.Tensor(np.vstack(df_target['input_ids'].values))
-        target_token_type_ids = torch.zeros(target_input_ids.shape[0], 512)
-        target_attention_mask = torch.Tensor(np.vstack(df_target['attention_mask'].values))
-        t_domain_list = [1] * target_input_ids.shape[0]
-
-        # 1. 根据源域和目标域的比例确定采样比例
-        source_target_ratio = source_target_ratio
-        target_seq_sample_nums = int(s_ids_train.shape[0] / source_target_ratio)
-
-        # 2. 从目标域数据中随机抽样 target_seq_nums 个样本
-        '''
-        TODO: 抽样时需要保证目标域数据集的长度大于采样长度 target_seq_sample_nums, 尝试用 try except 完善
-        '''
-        rondam_sample_index = torch.LongTensor(random.sample(range(target_input_ids.shape[0]), target_seq_sample_nums))
-        
-        target_input_ids_sample = torch.index_select(target_input_ids, 0, rondam_sample_index)
-        target_token_type_sample = torch.index_select(target_token_type_ids, 0, rondam_sample_index)
-        target_attention_mask_sample = torch.index_select(target_attention_mask, 0, rondam_sample_index)
-
-        # 3. 将目标域抽样后得到的样本复制扩充 source_target_ratio + 1 倍
-        target_input_ids_sample = target_input_ids_sample.repeat(source_target_ratio + 1, 1)
-        target_token_type_sample = target_token_type_sample.repeat(source_target_ratio + 1, 1)
-        target_attention_mask_sample = target_attention_mask_sample.repeat(source_target_ratio + 1, 1)
-
-        # 4. 从扩充后的样本中随机抽样 s_ids_train.shape[0] (源域训练集数量) 个样本
-        rondam_sample_index = torch.LongTensor(random.sample(range(target_input_ids_sample.shape[0]), s_ids_train.shape[0]))
-
-        self.target_input_ids_train = torch.index_select(target_input_ids_sample, 0, rondam_sample_index)
-        self.target_token_type_ids_train = torch.index_select(target_token_type_sample, 0, rondam_sample_index)
-        self.target_attention_mask_train = torch.index_select(target_attention_mask_sample, 0, rondam_sample_index)
-        self.target_domain_label_train = ((source_target_ratio + 1) * t_domain_list)[:s_ids_train.shape[0]]
+        # '''
+        # Jupyter only
+        # '''
+        # target_input_ids = torch.Tensor(np.vstack(df_target['input_ids'].values))
+        # target_token_type_ids = torch.zeros(target_input_ids.shape[0], 512)
+        # target_attention_mask = torch.Tensor(np.vstack(df_target['attention_mask'].values))
+        # t_domain_list = list(df_target['domain_label'].values)
+        #
+        # # 1. 根据源域和目标域的比例确定采样比例
+        # source_target_ratio = source_target_ratio
+        # target_seq_sample_nums = int(s_ids_train.shape[0] / source_target_ratio)
+        #
+        # # 2. 从目标域数据中随机抽样 target_seq_nums 个样本
+        # '''
+        # TODO: 抽样时需要保证目标域数据集的长度大于采样长度 target_seq_sample_nums, 尝试用 try except 完善
+        # '''
+        # rondam_sample_index = torch.LongTensor(random.sample(range(target_input_ids.shape[0]), target_seq_sample_nums))
+        #
+        # target_input_ids_sample = torch.index_select(target_input_ids, 0, rondam_sample_index)
+        # target_token_type_sample = torch.index_select(target_token_type_ids, 0, rondam_sample_index)
+        # target_attention_mask_sample = torch.index_select(target_attention_mask, 0, rondam_sample_index)
+        #
+        # # 3. 将目标域抽样后得到的样本复制扩充 source_target_ratio + 1 倍
+        # target_input_ids_sample = target_input_ids_sample.repeat(source_target_ratio + 1, 1)
+        # target_token_type_sample = target_token_type_sample.repeat(source_target_ratio + 1, 1)
+        # target_attention_mask_sample = target_attention_mask_sample.repeat(source_target_ratio + 1, 1)
+        #
+        # # 4. 从扩充后的样本中随机抽样 s_ids_train.shape[0] (源域训练集数量) 个样本
+        # rondam_sample_index = torch.LongTensor(random.sample(range(target_input_ids_sample.shape[0]), s_ids_train.shape[0]))
+        #
+        # self.target_input_ids_train = torch.index_select(target_input_ids_sample, 0, rondam_sample_index)
+        # self.target_token_type_ids_train = torch.index_select(target_token_type_sample, 0, rondam_sample_index)
+        # self.target_attention_mask_train = torch.index_select(target_attention_mask_sample, 0, rondam_sample_index)
+        # self.target_domain_label_train = ((source_target_ratio + 1) * t_domain_list)[:s_ids_train.shape[0]]
+        #
+        # self.target_input_ids_train_with_label = torch.Tensor(np.vstack(df_sampled_target['input_ids'].values))
+        # self.target_token_type_ids_with_label = torch.zeros(self.target_input_ids_train.shape[0], 512)
+        # self.target_attention_mask_train_with_label = torch.Tensor(np.vstack(df_sampled_target['attention_mask'].values))
+        # self.target_class_label_train_with_label = list(df_sampled_target['label'].values)
+        # self.target_domain_label_train_with_label = [1] * self.target_input_ids_train.shape[0]
 
         '''
         将目标域上的全部数据作为测试集, 标签包含 class label 和 domain label
@@ -273,16 +309,25 @@ class DataPreprocess(object):
         '''
         Jupyter only
         '''
-        self.target_input_ids_test = torch.Tensor(np.vstack(df_target['input_ids'].values))
+        self.target_input_ids_test = torch.Tensor(np.vstack(df_target_test['input_ids'].values))
         self.target_token_type_ids_test = torch.zeros(self.target_input_ids_test.shape[0], 512)
-        self.target_attention_mask_test = torch.Tensor(np.vstack(df_target['attention_mask'].values))
-        self.target_class_label_test = list(df_target['label'].values)
-        self.target_domain_label_test = [1] * self.target_input_ids_test.shape[0]
+        self.target_attention_mask_test = torch.Tensor(np.vstack(df_target_test['attention_mask'].values))
+        self.target_class_label_test = list(df_target_test['label'].values)
+        self.target_domain_label_test = list(df_target_test['domain_label'].values)
 
-        del df_source, df_target, s_ids_train, s_ids_eval, s_type_train, s_type_eval, s_mask_train, s_mask_eval, \
-            s_class_train, s_class_eval, s_domain_train, s_domain_eval, target_input_ids, target_token_type_ids, \
-            target_attention_mask, source_target_ratio, target_seq_sample_nums, rondam_sample_index, target_input_ids_sample, \
-            target_token_type_sample, target_attention_mask_sample
+        self.source_input_ids_test = torch.Tensor(np.vstack(df_source_test['input_ids'].values))
+        self.source_attention_mask_test = torch.Tensor(np.vstack(df_source_test['attention_mask'].values))
+        self.source_class_label_test = list(df_source_test['label'].values)
+        self.source_domain_label_test = list(df_source_test['domain_label'].values)
+
+        # del df_source, df_target, s_ids_train, s_ids_eval, s_type_train, s_type_eval, s_mask_train, s_mask_eval, \
+        #     s_class_train, s_class_eval, s_domain_train, s_domain_eval, target_input_ids, target_token_type_ids, \
+        #     target_attention_mask, source_target_ratio, target_seq_sample_nums, rondam_sample_index, target_input_ids_sample, \
+        #     target_token_type_sample, target_attention_mask_sample, df_sampled_target
+        del df_source, df_source_train, df_source_test, df_target, df_label_0, df_label_1, df_label_0_sample, \
+            df_label_1_sample, df_train, source_input_ids, source_token_type_ids, source_attention_mask, s_class_list,\
+            s_domain_list, s_ids_train, s_ids_eval, s_type_train, s_type_eval, s_mask_train, s_mask_eval, s_class_train,\
+            s_class_eval, s_domain_train, s_domain_eval, source_target_ratio, df_target_train, df_target_test
         
     @staticmethod
     def minimum_length_drop(df: pd.DataFrame, feature: str, minimum_length: int = 5):
@@ -408,22 +453,74 @@ class DataPreprocess(object):
 
     def get_train_data_dict(self, ):
         return {'input_ids': self.source_input_ids_train, 'attention_mask': self.source_attention_mask_train, \
-                'class_label': self.source_class_label_train, 'domain_label': self.source_domain_label_train}, \
-               {'input_ids': self.target_input_ids_train, 'attention_mask': self.target_attention_mask_train, \
-                'domain_label': self.target_domain_label_train}
-    
+                'class_label': self.source_class_label_train, 'domain_label': self.source_domain_label_train}# , \
+               # {'input_ids': self.target_input_ids_train, 'attention_mask': self.target_attention_mask_train, \
+               #  'domain_label': self.target_domain_label_train}, \
+               # {'input_ids': self.target_input_ids_train_with_label,
+               #  'attention_mask': self.target_attention_mask_train_with_label,
+               #  'class_label': self.target_class_label_train_with_label,
+               #  'domain_label': self.target_domain_label_train_with_label}
+
     def get_eval_data_dict(self, ):
         return {'input_ids': self.source_input_ids_eval, 'attention_mask': self.source_attention_mask_eval, \
                 'class_label': self.source_class_label_eval, 'domain_label': self.source_domain_label_eval}
     
     def get_test_data_dict(self, ):
-        return {'input_ids': self.target_input_ids_test, 'attention_mask': self.target_attention_mask_test, \
+        return {'input_ids': self.source_input_ids_test, 'attention_mask': self.source_attention_mask_test,
+                'class_label': self.source_class_label_test, 'domain_label': self.source_domain_label_test}, \
+               {'input_ids': self.target_input_ids_test, 'attention_mask': self.target_attention_mask_test,
                 'class_label': self.target_class_label_test, 'domain_label': self.target_domain_label_test}
             
 
+# class LogDatasetDomainAdaptation_Train(Dataset):
+#
+#     def __init__(self, source_data_dict: dict, target_data_dict: dict, target_data_with_label_dict: dict) -> None:
+#         super(LogDatasetDomainAdaptation_Train).__init__()
+#
+#         self.source_input_ids_train: torch.Tensor = source_data_dict['input_ids']
+#         self.source_attention_mask_train: torch.Tensor = source_data_dict['attention_mask']
+#         self.source_class_label_train: list = source_data_dict['class_label']
+#         self.source_domain_label_train: list = source_data_dict['domain_label']
+#
+#         self.target_input_ids_train: torch.Tensor = target_data_dict['input_ids']
+#         self.target_attention_mask_train: torch.Tensor = target_data_dict['attention_mask']
+#         self.target_domain_label_train: list = target_data_dict['domain_label']
+#
+#         self.target_input_ids_train_with_label: torch.Tensor = target_data_with_label_dict['input_ids']
+#         self.target_attention_mask_train_with_label: torch.Tensor = target_data_with_label_dict['attention_mask']
+#         self.target_class_label_train_with_label: list = target_data_with_label_dict['class_label']
+#         self.target_domain_label_train_with_label: list = target_data_with_label_dict['domain_label']
+#
+#     def __getitem__(self, idx) -> Tuple[dict]:
+#
+#         source_input_ids = self.source_input_ids_train[idx].long()
+#         source_attention_mask = self.source_attention_mask_train[idx].long()
+#         source_class_label = torch.Tensor([self.source_class_label_train[idx]]).float()
+#         source_domain_label = torch.Tensor([self.source_domain_label_train[idx]]).float()
+#
+#         target_input_ids =  self.target_input_ids_train[idx].long()
+#         target_attention_mask = self.target_attention_mask_train[idx].long()
+#         target_domain_label = torch.Tensor([self.target_domain_label_train[idx]]).float()
+#
+#         target_input_ids_with_label = self.target_input_ids_train_with_label[idx].long()
+#         target_attention_mask_with_label = self.target_attention_mask_train_with_label[idx].long()
+#         target_class_label_with_label = torch.Tensor([self.target_class_label_train_with_label[idx]]).float()
+#         target_domain_label_with_label = torch.Tensor([self.target_domain_label_train_with_label[idx]]).float()
+#
+#         return {'input_ids': source_input_ids, 'attention_mask': source_attention_mask}, \
+#                {'class_label': source_class_label, 'domain_label': source_domain_label}, \
+#                {'input_ids': target_input_ids, 'attention_mask': target_attention_mask}, \
+#                {'domain_label': target_domain_label}, \
+#                {'input_ids': target_input_ids_with_label, 'attention_mask': target_attention_mask_with_label}, \
+#                {'class_label': target_class_label_with_label, 'domain_label': target_domain_label_with_label}
+#
+#     def __len__(self, ):
+#         return self.source_input_ids_train.shape[0]
+
+
 class LogDatasetDomainAdaptation_Train(Dataset):
 
-    def __init__(self, source_data_dict: dict, target_data_dict: dict) -> None:
+    def __init__(self, source_data_dict: dict) -> None:
         super(LogDatasetDomainAdaptation_Train).__init__()
 
         self.source_input_ids_train: torch.Tensor = source_data_dict['input_ids']
@@ -431,26 +528,15 @@ class LogDatasetDomainAdaptation_Train(Dataset):
         self.source_class_label_train: list = source_data_dict['class_label']
         self.source_domain_label_train: list = source_data_dict['domain_label']
 
-        self.target_input_ids_train: torch.Tensor = target_data_dict['input_ids']
-        self.target_attention_mask_train: torch.Tensor = target_data_dict['attention_mask']
-        self.target_domain_label_train: list = target_data_dict['domain_label']
-
     def __getitem__(self, idx) -> Tuple[dict]:
-        
         source_input_ids = self.source_input_ids_train[idx].long()
         source_attention_mask = self.source_attention_mask_train[idx].long()
         source_class_label = torch.Tensor([self.source_class_label_train[idx]]).float()
         source_domain_label = torch.Tensor([self.source_domain_label_train[idx]]).float()
 
-        target_input_ids =  self.target_input_ids_train[idx].long()
-        target_attention_mask = self.target_attention_mask_train[idx].long()
-        target_domain_label = torch.Tensor([self.target_domain_label_train[idx]]).float()
-
         return {'input_ids': source_input_ids, 'attention_mask': source_attention_mask}, \
-               {'class_label': source_class_label, 'domain_label': source_domain_label}, \
-               {'input_ids': target_input_ids, 'attention_mask': target_attention_mask}, \
-               {'domain_label': target_domain_label}
-    
+               {'class_label': source_class_label, 'domain_label': source_domain_label}
+
     def __len__(self, ):
         return self.source_input_ids_train.shape[0]
     
@@ -481,7 +567,7 @@ class LogDatasetDomainAdaptation_Eval(Dataset):
 
 class LogDatasetDomainAdaptation_Test(Dataset):
 
-    def __init__(self, target_data_dict: dict) -> None:
+    def __init__(self, source_data_dict: dict, target_data_dict: dict) -> None:
         super(LogDatasetDomainAdaptation_Test).__init__()
 
         self.target_input_ids_test: torch.Tensor = target_data_dict['input_ids']
@@ -502,6 +588,28 @@ class LogDatasetDomainAdaptation_Test(Dataset):
     def __len__(self, ):
         return self.target_input_ids_test.shape[0]
 
+
+class LogDatasetDomainAdaptation_Test(Dataset):
+
+    def __init__(self, source_data_dict: dict) -> None:
+        super(LogDatasetDomainAdaptation_Test).__init__()
+
+        self.source_input_ids_test: torch.Tensor = source_data_dict['input_ids']
+        self.source_attention_mask_test: torch.Tensor = source_data_dict['attention_mask']
+        self.source_class_label_test: list = source_data_dict['class_label']
+        self.source_domain_label_test: list = source_data_dict['domain_label']
+
+    def __getitem__(self, idx) -> Tuple[dict]:
+        source_input_ids = self.source_input_ids_test[idx].long()
+        source_attention_mask = self.source_attention_mask_test[idx].long()
+        source_class_label = torch.Tensor([self.source_class_label_test[idx]]).float()
+        source_domain_label = torch.Tensor([self.source_domain_label_test[idx]]).float()
+
+        return {'input_ids': source_input_ids, 'attention_mask': source_attention_mask}, \
+               {'class_label': source_class_label, 'domain_label': source_domain_label}
+
+    def __len__(self, ):
+        return self.source_input_ids_test.shape[0]
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
