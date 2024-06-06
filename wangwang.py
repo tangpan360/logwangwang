@@ -31,7 +31,7 @@ def arg_parser():
     parser.add_argument('--minimum_drop_length', help='drop sequences whose length is less than the shreshold, valid only when minimum_drop_length > 0', default=5)
     
     # training parameters
-    parser.add_argument("--max_epoch", help="epochs", default=500)
+    parser.add_argument("--max_epoch", help="epochs", default=100)
     parser.add_argument("--batch_size", help="batch size", default=200)  # 1200, 600
     parser.add_argument("--lr", help="learning rate", default=1e-5)
     parser.add_argument('--patience', help='patience of early stop', default=100)

@@ -146,7 +146,8 @@ class Trainer(object):
                 #        source_domain_loss / (source_domain_loss.detach() + 10e-8) + \
                 #        target_domain_loss / (target_domain_loss.detach() + 10e-8)
                 # loss = source_class_loss + source_domain_loss + target_domain_loss + target_class_loss_with_label  # add by tp
-                loss = source_class_loss + source_domain_loss  # add by tp
+                # loss = source_class_loss + source_domain_loss  # add by tp
+                loss = source_class_loss  # add by tp
                 # self.train_class_loss += source_class_loss.item() / len(train_loader)
                 self.train_class_loss += source_class_loss.item() / len(train_loader)
                 # self.train_doamin_loss += (source_domain_loss.item() + target_domain_loss.item()) / len(train_loader)
@@ -218,7 +219,8 @@ class Trainer(object):
             w domain
             '''
             # eval_loss = self.eval_doamin_loss # self.eval_class_loss + self.eval_doamin_loss
-            eval_loss = self.eval_doamin_loss + self.eval_class_loss  # self.eval_class_loss + self.eval_doamin_loss
+            # eval_loss = self.eval_doamin_loss + self.eval_class_loss  # self.eval_class_loss + self.eval_doamin_loss
+            eval_loss = self.eval_class_loss  # self.eval_class_loss + self.eval_doamin_loss
             self.eval_loss_list.append(eval_loss)
             self.eval_class_loss_list.append(self.eval_class_loss)
             self.eval_doamin_loss_list.append(self.eval_doamin_loss)
