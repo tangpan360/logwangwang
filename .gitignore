@@ -13,7 +13,7 @@ debug.py
 # Folder
 loss_dir/
 saved_model/
-Dataset/
+Dataset/*
 bert_mini_checkpoint/
 bert_mini_checkpoint_wo_DA_result/
 bert_tiny_checkpoint/
@@ -33,3 +33,6 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 *$py.class
+
+!Dataset/bgl_data_trans.ipynb
+!Dataset/thunder_bird_data_transfer.ipynb
